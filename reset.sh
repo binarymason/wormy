@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
+rm -rf data
 mkdir -p data/images
-rm -rf data/images/*.png
-rm -rf data/labels.csv
+touch data/.gitkeep
 echo '{ "idx": 0 }' > data/meta.json

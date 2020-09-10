@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 import json
 import os
+import pandas as pd
 
 with open("./data/meta.json") as fd:
   meta = json.loads(fd.read())
@@ -75,10 +76,17 @@ def on_release(key):
     pass
 
 
+def trim_last_lines_of_file(path, deletions):
+  df = pd.read_csv(path)
 
-def trim_last_lines_of_file(path, nlines=3):
-  os.system(f"head -n -{nlines} {path} > {path}.tmp")
-  os.system(f"mv {path}.tmp {path}")
+  for image in deletions:
+    row = df[df.path == image.name]
+
+    if len(row) == 1:
+        df = df.drop(row.index[0])
+
+  #  df.drop(df.tail(nlines).index, inplace=True)
+  df.to_csv(path, index=False)
 
 
 # remove last 2 images on ctrl-c because I probably died
@@ -86,20 +94,27 @@ def signal_handler(sig, frame):
   global CTX
   print('You pressed Ctrl+C!')
 
-  print("saving meta")
-  with open("./data/meta.json", "w") as fd:
-    fd.write(json.dumps(CTX['meta']))
+  try:
+    print("saving meta")
+    with open("./data/meta.json", "w") as fd:
+        fd.write(json.dumps(CTX['meta']))
 
-  print("deleting last three frames")
-  for p in sorted(list(Path("./data/images").iterdir()), reverse=True)[-3:]:
-    print("+ deleting", p)
-    p.unlink()
+    print("deleting last three frames")
+    deletions = sorted(list(Path("./data/images").iterdir()))[-3:]
+    for p in deletions:
+        print("+ deleting", p)
+        p.unlink()
 
-  print("deleting last three labels")
-  trim_last_lines_of_file("./data/labels.csv", nlines=3)
 
-  print("done")
-  sys.exit(0)
+    print("deleting last three labels")
+    trim_last_lines_of_file("./data/labels.csv", deletions)
+
+
+  except Exception as err:
+      print("!", err)
+  finally:
+    print("done")
+    sys.exit(0)
 
 signal.signal(signal.SIGINT, signal_handler)
 
@@ -109,11 +124,11 @@ with mouse.Listener(on_move=on_move, on_click=on_click, on_press=on_press) as ml
     labels = Path("./data/labels.csv")
     if not labels.exists():
       with open(labels, "w") as fd:
-        writer = csv.writer(fd, delimiter="|")
+        writer = csv.writer(fd)
         writer.writerow(["path", "x", "y", "c", "w", "e"])
 
     with open(labels, "a") as fd:
-      writer = csv.writer(fd, delimiter="|")
+      writer = csv.writer(fd)
 
       while True:
         CTX['meta']['idx'] += 1
@@ -130,6 +145,7 @@ with mouse.Listener(on_move=on_move, on_click=on_click, on_press=on_press) as ml
 
         line = [fname, rx, ry, c, w, e]
         writer.writerow(line)
+        fd.flush() # don't buffer anything
         print(line)
 
 
