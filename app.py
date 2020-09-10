@@ -18,7 +18,7 @@ with open("./data/meta.json") as fd:
 CTX = dict(
     meta=meta,
     keyboard=dict(w=False, e=False),
-    mouse=dict(click=False, pointer=(0,0)),
+    mouse=dict(click=False, degrees=0),
     screen=dict(),
     )
 
@@ -35,7 +35,7 @@ def moved(event):
     x2 = int(x + w)
     y2 = int(y + h)
 
-    midpoint = (int(w/2), int(h/2))
+    midpoint = (int(x+w/2), int(y+h/2))
 
     CTX['screen'] = dict(bbox=(x, y, x2, y2), shape=(w, h), midpoint=midpoint)
     CTX['origin'] = dict(point=(x,y), geometry=f"{w}x{h}+{x}+{y}")
@@ -84,14 +84,9 @@ def on_move(x, y):
     theta = math.degrees(math.acos((A**2+B**2-C**2)/(2*A*B)))
 
   if rx < 0: # left side of screen
-      theta *= -1
+      theta += 180
 
-
-  print("#", theta)
-
-  # convert to relative points to image frame
-  rx, ry = x-ox, y-oy
-  CTX['mouse']['pointer'] = (rx, ry)
+  CTX['mouse']['degrees'] = theta
 
 def on_click(x, y, button, pressed):
   global CTX
@@ -162,7 +157,7 @@ with mouse.Listener(on_move=on_move, on_click=on_click, on_press=on_press) as ml
     if not labels.exists():
       with open(labels, "w") as fd:
         writer = csv.writer(fd)
-        writer.writerow(["path", "x", "y", "c", "w", "e"])
+        writer.writerow(["path", "d", "c", "w", "e"])
 
     with open(labels, "a") as fd:
       writer = csv.writer(fd)
@@ -175,12 +170,12 @@ with mouse.Listener(on_move=on_move, on_click=on_click, on_press=on_press) as ml
         fname = '{:08d}.png'.format(CTX['meta']['idx'])
         im.save(f"data/images/{fname}")
 
-        rx, ry = CTX['mouse']['pointer']
-        c = int(CTX['mouse']['click'])
-        w = int(CTX['keyboard']['w'])
-        e = int(CTX['keyboard']['e'])
+        d = float(CTX['mouse']['degrees']) / 359
+        c = float(CTX['mouse']['click'])
+        w = float(CTX['keyboard']['w'])
+        e = float(CTX['keyboard']['e'])
 
-        line = [fname, rx, ry, c, w, e]
+        line = [fname, d, c, w, e]
         writer.writerow(line)
         fd.flush() # don't buffer anything
         print(line)
