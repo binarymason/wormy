@@ -10,6 +10,7 @@ from pathlib import Path
 import json
 import os
 import pandas as pd
+import math
 
 with open("./data/meta.json") as fd:
   meta = json.loads(fd.read())
@@ -17,7 +18,8 @@ with open("./data/meta.json") as fd:
 CTX = dict(
     meta=meta,
     keyboard=dict(w=False, e=False),
-    mouse=dict(click=False, pointer=(0,0))
+    mouse=dict(click=False, pointer=(0,0)),
+    screen=dict(),
     )
 
 # Set up a TKinter window to specify capture window
@@ -32,7 +34,10 @@ def moved(event):
 
     x2 = int(x + w)
     y2 = int(y + h)
-    CTX['screen'] = (x, y, x2, y2)
+
+    midpoint = (int(w/2), int(h/2))
+
+    CTX['screen'] = dict(bbox=(x, y, x2, y2), shape=(w, h), midpoint=midpoint)
     CTX['origin'] = dict(point=(x,y), geometry=f"{w}x{h}+{x}+{y}")
 
 root.wait_visibility(root)
@@ -46,11 +51,43 @@ print("sleeping 3 secs so you have time to start game...")
 time.sleep(3)
 print("ok")
 
-bbox = CTX['screen']
+bbox = CTX['screen']['bbox']
 
 def on_move(x, y):
   global CTX
   ox, oy = CTX['origin']['point']
+  mx, my = CTX['screen']['midpoint']
+
+  # convert point to relative from center point
+  # flip Y sign so forwards is a positive number
+  rx, ry = x-mx, (y-my)*-1
+
+  # given relative point, calculate theta angle from midpoint
+  h = math.hypot(rx, ry)
+
+  C = rx # always opposite from midpoint (origin) angle
+  B = h
+  A = ry
+
+  if A == 0 and C == 0: # exact midpoint
+    theta = 0
+  elif A == 0: # horizontal
+    theta = 90
+  elif C == 0: # vertical
+    if ry > 0: # forwards
+      theta = 0
+    else:
+      theta = 180
+  elif A == 0 and C == 0: # exact midpoint
+    theta = 0
+  else:
+    theta = math.degrees(math.acos((A**2+B**2-C**2)/(2*A*B)))
+
+  if rx < 0: # left side of screen
+      theta *= -1
+
+
+  print("#", theta)
 
   # convert to relative points to image frame
   rx, ry = x-ox, y-oy
